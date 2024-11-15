@@ -2,29 +2,61 @@
 title: "p8105_hw4_CY2772"
 author: "Chenhui Yan"
 date: "2024-11-14"
-output: html_document
+output: github_document
 ---
+```{r}
+library(tidyverse)
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(broom)
+library(purrr)
 ```
 
-## R Markdown
+# Problem 1: Birthday problem
+```{r}
+# Create the simulation function
+simulate_birthday = function(n) {
+  birthdays <- sample(1:365, size = n, replace = TRUE)
+  any(duplicated(birthdays))
+}
+```
+```{r}
+# Run the simulation for each group size
+set.seed(123)  # For reproducibility
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+group_sizes = 2:50
+num_simulations = 10000
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+probabilities = sapply(group_sizes, function(n) {
+  results = replicate(num_simulations, simulate_birthday(n))
+  mean(results)
+})
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+```{r}
+# Plot the probabilities
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+plot_data = data.frame(
+  group_size = group_sizes,
+  probability = probabilities
+)
+
+ggplot(plot_data, aes(x = group_size, y = probability)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +
+  labs(
+    title = "Probability of At Least Two People Sharing a Birthday",
+    x = "Group Size",
+    y = "Probability"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1))
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+The plot shows a sigmoid-like curve, starting very low for small groups and then rapidly increasing around group sizes of 20-30, and then leveling off near 1 (100%) for group sizes approaching 50.
+
+
+
+
+
