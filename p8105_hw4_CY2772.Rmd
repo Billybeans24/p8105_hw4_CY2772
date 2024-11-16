@@ -8,6 +8,8 @@ output: github_document
 library(tidyverse)
 library(broom)
 library(purrr)
+library(knitr)
+library(ggplot2)
 ```
 
 # Problem 1: Birthday problem
@@ -163,4 +165,98 @@ ggplot(summary_results, aes(x = true_mu)) +
 
 ```
 When considering all samples, the average estimated mean $\hat{\mu}$ closely reflects the true mean value. However, if we examine only the samples where the null hypothesis was rejected, the average estimate tends to be higher than the true mean, particularly when the true mean is small. This happens due to selection bias, as only those samples that show larger deviations from the null hypothesis are included in this subset.
+
+# Problem3
+## Load and describe the raw data
+```{r}
+homicides = read_csv("./homicide-data.csv")|>
+  janitor::clean_names()
+summary(homicides)
+```
+## create city_state variable and summarise
+```{r}
+# Create a new 'city_state' variable by combining 'city' and 'state'
+homicides = homicides %>% 
+  mutate(city_state = paste(city, state, sep = ", "))
+
+# Summarize the total and unsolved homicides by 'city_state'
+summ_homicides = homicides %>% 
+  group_by(city_state) %>% 
+  summarize(
+    total_homicides = n(),
+    unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest"))
+  )
+
+# Display the summarized data in a nicely formatted table
+summ_homicides %>%  knitr::kable()
+
+```
+```{r}
+# Use dplyr's filter function to get data for Baltimore, MD
+baltimore_data = summ_homicides %>%
+  filter(city_state == "Baltimore, MD") %>%
+  select(unsolved_homicides, total_homicides)
+
+unsolved_cases = baltimore_data$unsolved_homicides
+total_cases = baltimore_data$total_homicides
+
+# Perform the proportion test
+baltimore_prop_test = prop.test(
+  x = unsolved_cases,
+  n = total_cases
+)
+
+
+baltimore_results = baltimore_prop_test %>%
+  tidy() %>%
+  select(estimate, conf.low, conf.high)
+
+# Display the results
+print(baltimore_results)
+
+```
+```{r}
+# Perform proportion tests for all cities
+city_proportions = summ_homicides %>%
+  mutate(
+    # Apply prop.test to unsolved and total homicides for each city
+    prop_test = map2(
+      unsolved_homicides,
+      total_homicides,
+      ~ prop.test(x = .x, n = .y) %>% tidy()
+    )
+  ) %>%
+  unnest(prop_test) %>%
+  select(
+    city_state,
+    estimated_proportion = estimate,
+    conf_low = conf.low,
+    conf_high = conf.high
+  )
+# Display the estimated proportions and confidence intervals in a table
+city_proportions %>%
+  kable(
+    col.names = c("City, State", "Estimated Proportion", "CI Lower", "CI Upper"),
+    caption = "Proportion of Unsolved Homicides by City",
+    digits = 3,
+    format = "markdown"
+  )
+```
+
+```{r}
+ggplot(city_proportions, aes(x = reorder(city_state, estimated_proportion), y = estimated_proportion, color = city_state)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf_low, ymax = conf_high), width = 0.2) +
+  coord_flip() +
+  labs(
+    title = "Proportion of Unsolved Homicides by City",
+    x = "City",
+    y = "Estimated Proportion of Unsolved Homicides"
+  ) +
+  theme_minimal() +
+  theme(legend.position = 'none')
+
+
+
+```
 
